@@ -21,6 +21,10 @@
 #include "params/app_params.h"
 #endif
 
+#ifdef APP_CRAMB
+#include "cramb/app_cramb.h"
+#endif
+
 void user_apps_init(void)
 {
 #ifdef APP_PMSM_MC
@@ -38,4 +42,10 @@ void user_apps_init(void)
 #ifdef APP_PARAMS
 	app_params_init();
 #endif
+
+#ifdef APP_CRAMB
+	app_cramb_init();
+#endif
 }
+
+
