@@ -3,10 +3,10 @@
 
 #include "../../sys/defines.h"
 
-#define TASK_CRAMB_UPDATES_PER_SEC		(1)
+#define TASK_CRAMB_UPDATES_PER_SEC		(10000)
 #define TASK_CRAMB_INTERVAL_USEC		(USEC_IN_SEC / TASK_CRAMB_UPDATES_PER_SEC)
-#define DC_BUS (10.0)
-#define CC_BANDWIDTH (100)
+#define DC_BUS (20.0)
+#define CC_BANDWIDTH (300)
 
 void task_cramb_init(void);
 void task_cramb_deinit(void);
