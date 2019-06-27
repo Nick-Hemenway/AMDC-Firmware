@@ -1,6 +1,8 @@
 #include "pwm.h"
 #include "xil_io.h"
 #include <stdio.h>
+#include "../sys/defines.h"
+#include "../sys/scheduler.h"
 
 #define PWM_BASE_ADDR		(0x43C20000)
 
@@ -15,6 +17,8 @@ static uint16_t deadtime;
 void pwm_init(void)
 {
 	printf("PWM:\tInitializing...\n");
+
+	pwm_toggle_reset();
 
 	pwm_set_switching_freq(100000.0);
 	pwm_set_deadtime_ns(100);
@@ -84,7 +88,130 @@ void pwm_set_deadtime_ns(uint16_t time_ns)
 	Xil_Out32(PWM_BASE_ADDR + (26 * sizeof(uint32_t)), deadtime);
 }
 
-//void inverter_get_status(uint8_t idx, inverter_status_t *status)
-//{
-//
-//}
+
+void pwm_get_all_flt_temp(uint8_t *flt_temp)
+{
+	uint32_t value;
+
+	// Offset 28 is flt_temp
+	value = Xil_In32(PWM_BASE_ADDR + (28 * sizeof(uint32_t)));
+
+	// Only look at bottom 8 bits
+	value &= 0x000000FF;
+
+	*flt_temp = (uint8_t) value;
+}
+
+void pwm_get_all_flt_desat(uint8_t *flt_desat)
+{
+	uint32_t value;
+
+	// Offset 29 is flt_desat
+	value = Xil_In32(PWM_BASE_ADDR + (29 * sizeof(uint32_t)));
+
+	// Only look at bottom 8 bits
+	value &= 0x000000FF;
+
+	*flt_desat = (uint8_t) value;
+}
+
+void pwm_get_all_rdy(uint8_t *rdy)
+{
+	uint32_t value;
+
+	// Offset 30 is rdy
+	value = Xil_In32(PWM_BASE_ADDR + (30 * sizeof(uint32_t)));
+
+	// Only look at bottom 8 bits
+	value &= 0x000000FF;
+
+	*rdy = (uint8_t) value;
+}
+
+void pwm_set_all_rst(uint8_t rst)
+{
+	uint32_t value = 0;
+	value |= (uint32_t) rst;
+
+	// Offset 27 is rst output reg
+	Xil_Out32(PWM_BASE_ADDR + (27 * sizeof(uint32_t)), value);
+}
+
+void pwm_get_status(uint8_t idx, pwm_status_t *status)
+{
+	// Read status signals from hardware
+	uint8_t flt_temp, flt_desat, rdy;
+	pwm_get_all_flt_temp(&flt_temp);
+	pwm_get_all_flt_desat(&flt_desat);
+	pwm_get_all_rdy(&rdy);
+
+	uint8_t bit_mask = (1 << idx);
+
+	status->fault_temp  = (flt_temp  & bit_mask) ? 1 : 0;
+	status->fault_desat = (flt_desat & bit_mask) ? 1 : 0;
+	status->ready       = (rdy       & bit_mask) ? 1 : 0;
+}
+
+
+
+
+
+
+
+#define TOTAL_WAIT_TIME_SEC (0.001) // sec
+#define TOTAL_WAIT_TIME_USEC (TOTAL_WAIT_TIME_SEC * USEC_IN_SEC) //usec
+
+#define SM_INTERVAL_USEC (100) //usec
+
+typedef enum pwm_reset_state_e {
+	WAIT = 1,
+	REMOVE
+} pwm_reset_state_e;
+
+
+
+typedef struct pwm_reset_ctx_t {
+	pwm_reset_state_e state;
+	task_control_block_t tcb;
+	uint32_t elapsed_time_us;
+} pwm_reset_ctx_t;
+
+
+static pwm_reset_ctx_t pwm_ctx;
+
+
+void pwm_reset_callback(void *arg){
+
+	pwm_reset_ctx_t *ctx = (pwm_reset_ctx_t *) arg;
+
+	switch (ctx->state){
+
+	case WAIT:
+		ctx->elapsed_time_us += SM_INTERVAL_USEC;
+		if (ctx->elapsed_time_us > TOTAL_WAIT_TIME_USEC){
+			pwm_set_all_rst(0xFF); //set all pins to logic high
+			ctx->state = REMOVE;
+		}
+		break;
+
+	case REMOVE:
+
+		scheduler_tcb_unregister(&(ctx->tcb));
+		break;
+	}
+}
+
+void pwm_toggle_reset(void)
+{
+	//Initialize State machine
+	pwm_ctx.state = WAIT;
+	pwm_ctx.elapsed_time_us = 0;
+	pwm_set_all_rst(0x00); //set all output pins low immediately after call
+
+	//populate task struct
+	scheduler_tcb_init(&(pwm_ctx.tcb), pwm_reset_callback, &pwm_ctx, "pwm_reset", SM_INTERVAL_USEC);
+
+	//Run task
+	scheduler_tcb_register(&(pwm_ctx.tcb));
+}
+

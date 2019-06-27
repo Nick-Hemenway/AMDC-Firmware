@@ -1,3 +1,24 @@
+import numpy as np
+import pandas as pd
+
+def extract_averages( path, skiprows = 38 ):
+    
+    #this function takes the averages over each column and writes it to a new text file
+    
+    #skiprows = 38... the header of each text file is 38 lines long
+    arr = np.loadtxt( path, skiprows = skiprows) #load the data
+    arr = arr[:,1::] #get rid of the first column which is time because it is not needed
+    avg = np.average(arr, axis = 0)
+    
+    columns = 'My Fz Fx Fy Mx Mz'.split() #this is the order in of the columns in the data files
+    data = pd.Series(data = avg, index = columns)
+    
+    #return data frame instead of series
+    #avg = np.atleast_2d(avg)
+    #data = pd.DataFrame(data = avg, columns = columns) #using the global variable 'columnns'
+        
+    return data
+
 def command_que(cmds, execute_obj, info = None):
     
     #execute_obj needs to be callable and have a quit method

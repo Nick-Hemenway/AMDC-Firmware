@@ -1,7 +1,7 @@
 #ifdef APP_CRAMB
 
-#include "cmd_cramb.h"
-#include "../task_cramb.h"
+#include "cmd_cramb_axial.h"
+#include "../task_cramb_axial.h"
 #include "../../../sys/defines.h"
 #include "../../../sys/commands.h"
 #include "../../../sys/debug.h"
@@ -14,28 +14,27 @@
 
 static command_entry_t cmd_entry;
 
-#define NUM_HELP_ENTRIES	(11)
+#define NUM_HELP_ENTRIES	(10)
 static command_help_t cmd_help[NUM_HELP_ENTRIES] = {
 		{"init_cc", "Start current controller"},
 		{"deinit_cc", "Stop current controller"},
 		{"pole_volts", "Set Pole Voltages"},
-		{"phase_volts", "Set phase to neutral voltages"},
-		{"set_currents", "Set I1 and I2 currents values"},
-		{"read_currents", "print instantaneous currents to screen"},
-		{"read_adc", "read voltages on ADC (for determining current sensor gain)"},
+		{"set_volts", "Set voltage of output"},
+		{"set_current", "Set currents value in microamps"},
+		{"read_current", "print instantaneous current to screen"},
+		{"read_adc", "read voltage on ADC (for determining current sensor gain)"},
 		{"set_vdc", "set the DC bus voltage"},
 		{"set_cc_gains","Set the current controller gains by supplying machine parameters"},
-		{"set_inverter", "Set inverter output on the cabinet"},
-		{"pwm_reset", "Toggle reset button on all inverters"}
+		{"set_inverter", "Set inverter output on the cabinet"}
 };
 
-void cmd_cramb_register(void)
+void cmd_cramb_axial_register(void)
 {
 	// Populate the command entry block (struct)
 	commands_cmd_init(&cmd_entry,
-			"cramb", "Combined radial axial magnetic bearing commands",
+			"cramb_axial", "Combined radial axial magnetic bearing axial commands",
 			cmd_help, NUM_HELP_ENTRIES,
-			cmd_cramb
+			cmd_cramb_axial
 	);
 
 	// Register the command
@@ -46,7 +45,7 @@ void cmd_cramb_register(void)
 // Handles the 'cramb' command
 // and all sub-commands
 //
-int cmd_cramb(char **argv, int argc)
+int cmd_cramb_axial(char **argv, int argc)
 {
 	// Handle 'init' sub-command
 	if (strcmp("init_cc", argv[1]) == 0) {
@@ -54,9 +53,9 @@ int cmd_cramb(char **argv, int argc)
 		if (argc != 2) return INVALID_ARGUMENTS;
 
 		// Make sure cramb task was not already inited
-		if (task_cramb_is_inited()) return FAILURE;
+		if (task_cramb_axial_is_inited()) return FAILURE;
 
-		task_cramb_init();
+		task_cramb_axial_init();
 		return SUCCESS;
 	}
 
@@ -66,25 +65,23 @@ int cmd_cramb(char **argv, int argc)
 		if (argc != 2) return INVALID_ARGUMENTS;
 
 		// Make sure cramb task was already inited
-		if (!task_cramb_is_inited()) return FAILURE;
+		if (!task_cramb_axial_is_inited()) return FAILURE;
 
-		task_cramb_deinit();
+		task_cramb_axial_deinit();
 		return SUCCESS;
 	}
 
 
 	// Handle 'read_currents' sub-command
-	if (strcmp("read_currents", argv[1]) == 0) {
+	if (strcmp("read_current", argv[1]) == 0) {
 		// Check correct number of arguments
 		if (argc != 2) return INVALID_ARGUMENTS;
 
-		double abc[3];
+		double I_measured;
 
-		read_currents(abc);
+		read_current_axial(&I_measured);
 
-		debug_printf("%f\n\r", abc[0]);
-		debug_printf("%f\n\r", abc[1]);
-		debug_printf("%f\n\r", abc[2]);
+		debug_printf("%f\n\r", I_measured);
 
 		return SUCCESS;
 
@@ -93,51 +90,47 @@ int cmd_cramb(char **argv, int argc)
 	// Handle 'pole_volts' sub-command
 	if (strcmp("pole_volts", argv[1]) == 0) {
 		// Check correct number of arguments
-		if (argc != 5) return INVALID_ARGUMENTS;
+		if (argc != 4) return INVALID_ARGUMENTS;
 
 		//convert command line arguments to doubles
-		double Va, Vb, Vc;
+		double Va, Vb;
 		Va = ((double) atoi(argv[2]))/1e6;
 		Vb = ((double) atoi(argv[3]))/1e6;
-		Vc = ((double) atoi(argv[4]))/1e6;
 
 		//set pole voltages using command line inputs
-		set_pole_voltages(Va, Vb, Vc);
+		set_pole_volts_axial(Va, Vb);
 
 		return SUCCESS;
 
 	}
 
 	// Handle 'phase_volts' sub-command
-	if (strcmp("phase_volts", argv[1]) == 0) {
+	if (strcmp("set_volts", argv[1]) == 0) {
 		// Check correct number of arguments
-		if (argc != 5) return INVALID_ARGUMENTS;
+		if (argc != 3) return INVALID_ARGUMENTS;
 
 		//convert command line arguments to doubles
-		double Va, Vb, Vc;
-		Va = ((double) atoi(argv[2]))/1e6;
-		Vb = ((double) atoi(argv[3]))/1e6;
-		Vc = ((double) atoi(argv[4]))/1e6;
+		double V_out;
+		V_out = ((double) atoi(argv[2]))/1e6;
 
 		//set line to neutral voltages using command line inputs
-		set_ln_voltages(Va, Vb, Vc);
+		set_voltage_axial(V_out);
 
 		return SUCCESS;
 
 	}
 
 	// Handle 'set_currents' sub-command
-	if (strcmp("set_currents", argv[1]) == 0) {
+	if (strcmp("set_current", argv[1]) == 0) {
 		// Check correct number of arguments
-		if (argc != 4) return INVALID_ARGUMENTS;
+		if (argc != 3) return INVALID_ARGUMENTS;
 
 		//convert command line arguments to doubles
-		double I1, I2;
-		I1 = ((double) atoi(argv[2]))/1e6;
-		I2 = ((double) atoi(argv[3]))/1e6;
+		double I_command;
+		I_command = ((double) atoi(argv[2]))/1e6;
 
 		//set pole voltages using command line inputs
-		set_currents(I1, I2);
+		set_current_axial(I_command);
 
 		return SUCCESS;
 
@@ -148,13 +141,11 @@ int cmd_cramb(char **argv, int argc)
 		// Check correct number of arguments
 		if (argc != 2) return INVALID_ARGUMENTS;
 
-		double abc[3];
+		double adc;
 
-		read_adc(abc);
+		read_adc_axial(&adc);
 
-		debug_printf("%f\n\r", abc[0]);
-		debug_printf("%f\n\r", abc[1]);
-		debug_printf("%f\n\n\r", abc[2]);
+		debug_printf("%f\n\r", adc);
 
 		return SUCCESS;
 
@@ -170,7 +161,7 @@ int cmd_cramb(char **argv, int argc)
 		Vdc = ((double) atoi(argv[2]))/1e3;
 
 		//set pole voltages using command line inputs
-		set_vdc(Vdc);
+		set_vdc_axial(Vdc);
 
 		return SUCCESS;
 
@@ -188,7 +179,7 @@ int cmd_cramb(char **argv, int argc)
 		fb = (double) atoi(argv[4]); //frequency in Hz
 
 		//set pole voltages using command line inputs
-		set_cc_gains(R, L, fb);
+		set_cc_gains_axial(R, L, fb);
 
 		return SUCCESS;
 
@@ -205,25 +196,12 @@ int cmd_cramb(char **argv, int argc)
 
 		//set pole voltages using command line inputs
 		if ((inv_num > 0) && (inv_num < CABINET_NUM_INVERTERS)){
-			set_inverter(inv_num);
+			set_inverter_axial(inv_num);
 		}
 
 		return SUCCESS;
 
 	}
-
-	// Handle 'pwm_reset' sub-command
-	if (strcmp("pwm_reset", argv[1]) == 0) {
-		// Check correct number of arguments
-		if (argc != 2) return INVALID_ARGUMENTS;
-
-		pwm_toggle_reset();
-
-		return SUCCESS;
-
-	}
-
-
 
 	return INVALID_ARGUMENTS;
 }

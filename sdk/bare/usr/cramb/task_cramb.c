@@ -4,18 +4,23 @@
 #include "task_cramb.h"
 #include "../../sys/scheduler.h"
 #include "../../sys/debug.h"
-#include "machine.h"
 #include "clarke_transform.h"
 #include "../../drv/pwm.h"
 #include "../../drv/analog.h"
 
-static task_control_block_t tcb;
+#define Ts	(1.0 / TASK_CRAMB_UPDATES_PER_SEC)// sample time
+#define R_DEFAULT (10.0)
+#define L_DEFAULT (0.0075)
+#define CC_BANDWIDTH_DEFAULT (300) //Hz
+#define VDC_DEFAULT (20)//
+#define DEFAULT_INVERTER (5)
 
-//current control parameters:
-#define Wb					(CC_BANDWIDTH * PI2) // rad/s
-#define Ts					(1.0 / TASK_CRAMB_UPDATES_PER_SEC)
-#define Ki  				(R*Wb)
-#define Kp	    			(L*Wb)
+static int inverter_num = DEFAULT_INVERTER;
+static double Vdc = VDC_DEFAULT; //DC bus voltage
+static double Ki = R_DEFAULT*CC_BANDWIDTH_DEFAULT*PI2; //integral control gain
+static double Kp = L_DEFAULT*CC_BANDWIDTH_DEFAULT*PI2;  //proportional control gain
+
+static task_control_block_t tcb;
 
 //alpha-beta frame current commands (alpha is element 0)
 static double alpha_beta_star[] = {0,0};
@@ -38,11 +43,11 @@ void task_cramb_deinit(void)
 {
 	scheduler_tcb_unregister(&tcb);
 
-	pwm_set_duty(CAB_INV6_PHA, 0.0);
-	pwm_set_duty(CAB_INV6_PHB, 0.0);
-	pwm_set_duty(CAB_INV6_PHC, 0.0);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxA, 0.0);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxB, 0.0);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxC, 0.0);
 
-	//reset commanded currents to zero
+	//reset commanded currents to ze
 	alpha_beta_star[0] = 0.0;
 	alpha_beta_star[1] = 0.0;
 }
@@ -93,13 +98,26 @@ void read_currents(double *abc){
 
 	float phase_a_adc, phase_b_adc, phase_c_adc;
 
-	analog_getf(CAB_INV6_PHA_ADC, &phase_a_adc);
-	analog_getf(CAB_INV6_PHB_ADC, &phase_b_adc);
-	analog_getf(CAB_INV6_PHC_ADC, &phase_c_adc);
+	analog_getf(cabinet_lookup[inverter_num].adcChA, &phase_a_adc);
+	analog_getf(cabinet_lookup[inverter_num].adcChB, &phase_b_adc);
+	analog_getf(cabinet_lookup[inverter_num].adcChC, &phase_c_adc);
 
-	abc[0] = phase_a_adc*CAB_INV6_PHA_ADC_GAIN + CAB_INV6_PHA_ADC_OFFSET;
-	abc[1] = phase_b_adc*CAB_INV6_PHB_ADC_GAIN + CAB_INV6_PHB_ADC_OFFSET;
-	abc[2] = phase_c_adc*CAB_INV6_PHC_ADC_GAIN + CAB_INV6_PHC_ADC_OFFSET;
+	abc[0] = phase_a_adc*cabinet_lookup[inverter_num].adcGainA + cabinet_lookup[inverter_num].adcOffsetA;
+	abc[1] = phase_b_adc*cabinet_lookup[inverter_num].adcGainB + cabinet_lookup[inverter_num].adcOffsetB;
+	abc[2] = phase_c_adc*cabinet_lookup[inverter_num].adcGainC + cabinet_lookup[inverter_num].adcOffsetC;
+
+}
+
+void set_vdc(double DC_bus){
+
+	Vdc = DC_bus;
+
+}
+
+void set_cc_gains(double R_in, double L_in, double fb){
+
+	Ki = R_in*fb*PI2;
+	Kp = L_in*fb*PI2;
 
 }
 
@@ -118,13 +136,13 @@ void set_ln_voltages(double a, double b, double c){
 
 	double da, db, dc;
 
-	da = 0.5 + a/(DC_BUS);
-	db = 0.5 + b/(DC_BUS);
-	dc = 0.5 + c/(DC_BUS);
+	da = 0.5 + a/(Vdc);
+	db = 0.5 + b/(Vdc);
+	dc = 0.5 + c/(Vdc);
 
-	pwm_set_duty(CAB_INV6_PHA, da);
-	pwm_set_duty(CAB_INV6_PHB, db);
-	pwm_set_duty(CAB_INV6_PHC, dc);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxA, da);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxB, db);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxC, dc);
 }
 
 void set_pole_voltages(double A, double B, double C){
@@ -132,13 +150,32 @@ void set_pole_voltages(double A, double B, double C){
 	//sets each of the three pole voltages manually
 	double da, db, dc;
 
-	da = A/DC_BUS;
-	db = B/DC_BUS;
-	dc = C/DC_BUS;
+	da = A/Vdc;
+	db = B/Vdc;
+	dc = C/Vdc;
 
-	pwm_set_duty(CAB_INV6_PHA, da);
-	pwm_set_duty(CAB_INV6_PHB, db);
-	pwm_set_duty(CAB_INV6_PHC, dc);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxA, da);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxB, db);
+	pwm_set_duty(cabinet_lookup[inverter_num].pwmIdxC, dc);
+}
+
+void set_inverter(int inv_num){
+
+	inverter_num = inv_num;
+}
+
+void read_adc(double *abc){
+
+	float phase_a_adc, phase_b_adc, phase_c_adc;
+
+	analog_getf(cabinet_lookup[inverter_num].adcChA, &phase_a_adc);
+	analog_getf(cabinet_lookup[inverter_num].adcChB, &phase_b_adc);
+	analog_getf(cabinet_lookup[inverter_num].adcChC, &phase_c_adc);
+
+	abc[0] = (double) phase_a_adc;
+	abc[1] = (double) phase_b_adc;
+	abc[2] = (double) phase_c_adc;
+
 }
 
 
