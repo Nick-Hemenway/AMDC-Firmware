@@ -25,6 +25,10 @@
 #include "cramb/app_cramb.h"
 #endif
 
+#ifdef APP_BLIM
+#include "blim/app_blim.h"
+#endif
+
 void user_apps_init(void)
 {
 #ifdef APP_PMSM_MC
@@ -45,6 +49,10 @@ void user_apps_init(void)
 
 #ifdef APP_CRAMB
 	app_cramb_init();
+#endif
+
+#ifdef APP_BLIM
+	app_blim_init();
 #endif
 }
 

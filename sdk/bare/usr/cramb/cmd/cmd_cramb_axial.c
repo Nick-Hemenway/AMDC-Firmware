@@ -195,7 +195,7 @@ int cmd_cramb_axial(char **argv, int argc)
 		inv_num = atoi(argv[2]); //inverter number
 
 		//set pole voltages using command line inputs
-		if ((inv_num > 0) && (inv_num < CABINET_NUM_INVERTERS)){
+		if ((inv_num > -1) && (inv_num < CABINET_NUM_INVERTERS)){
 			set_inverter_axial(inv_num);
 		}
 

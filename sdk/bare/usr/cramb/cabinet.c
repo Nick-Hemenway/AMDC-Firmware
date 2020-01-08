@@ -14,13 +14,13 @@
 #define CAB_INV4_PHA	(10)
 #define CAB_INV4_PHB	(9)
 
-#define CAB_INV5_PHA	(19)
-#define CAB_INV5_PHB	(20)
-#define CAB_INV5_PHC	(18)
+#define CAB_INV5_PHA	(16)
+#define CAB_INV5_PHB	(17)
+#define CAB_INV5_PHC	(15)
 
-#define CAB_INV6_PHA	(16)
-#define CAB_INV6_PHB	(17)
-#define CAB_INV6_PHC	(15)
+#define CAB_INV6_PHA	(22)
+#define CAB_INV6_PHB	(23)
+#define CAB_INV6_PHC	(21)
 
 //Single phase inverter current sensor channels
 #define CAB_INV1_ADC (ANLG_CHNL1)

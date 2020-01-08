@@ -210,11 +210,11 @@ if __name__ == "__main__":
     except:
         pass
         
-    amdc = AMDC(port = 'COM4', cmdEcho = False)
+    amdc = AMDC(port = 'COM6', cmdEcho = False)
     cramb = CRAMB(amdc, debug = True)
     
-    cramb.set_vdc(30)  
-    cramb.a_set_vdc(30)
+    cramb.set_vdc(10)  
+    cramb.a_set_vdc(10)
     
     
     
